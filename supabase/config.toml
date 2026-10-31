@@ -289,12 +289,14 @@ max_frequency = "5s"
 # uri = "pg-functions://<database>/<schema>/<hook_name>"
 
 # Configure one of the supported SMS providers: `twilio`, `twilio_verify`, `messagebird`, `textlocal`, `vonage`.
+# Local-dev stub: the CLI only enables phone login when provider credentials are
+# present, but our test numbers are intercepted by [auth.sms.test_otp] before any
+# provider call — Twilio is never actually contacted. Non-test numbers fail fast.
 [auth.sms.twilio]
-enabled = false
-account_sid = ""
-message_service_sid = ""
-# DO NOT commit your Twilio auth token to git. Use environment variable substitution instead:
-auth_token = "env(SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN)"
+enabled = true
+account_sid = "ACabtiklocaldev00000000000000000"
+message_service_sid = "MGabtiklocaldev0000000000000000"
+auth_token = "abtik-local-dev-stub"
 
 # Multi-factor-authentication is available to Supabase Pro plan.
 [auth.mfa]
