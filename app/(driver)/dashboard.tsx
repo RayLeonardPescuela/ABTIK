@@ -21,7 +21,7 @@ import {
   fetchMyDriverRow,
   type DriverSetupInput,
 } from '@/services/drivers';
-import { acceptRide, setDriverOnline } from '@/services/rides';
+import { acceptRide, fetchPendingRideRequest, setDriverOnline } from '@/services/rides';
 import { colors } from '@/theme/colors';
 import type { Driver, Ride } from '@/types/database';
 
@@ -79,6 +79,17 @@ export default function DriverDashboardScreen() {
   // Nearby request feed: RLS only delivers to online, vetted drivers anyway.
   useEffect(() => {
     if (!isOnline || !readyForTrips) return;
+
+    // Catch up on requests that were already pending when the driver came
+    // online (app restart, relogin, single-device demo) — the realtime
+    // subscription only fires for requests inserted from now on.
+    void fetchPendingRideRequest()
+      .then((ride) => {
+        if (ride) setIncoming((current) => current ?? ride);
+      })
+      .catch(() => {
+        // Feed nicety — new requests still arrive over realtime below.
+      });
 
     return subscribeToIncomingRides((ride) => {
       setIncoming((current) => current ?? ride);

@@ -62,6 +62,27 @@ export async function createRideRequest(input: CreateRideInput): Promise<Ride> {
 }
 
 /**
+ * Oldest still-`requested` ride this driver can currently see, if any.
+ *
+ * The realtime subscription only fires for requests inserted *after* the
+ * driver is online; this catch-up query surfaces anything already pending
+ * (app restart, relogin, single-device demo flow). RLS gates the result —
+ * only online, vetted, nearby drivers get a row.
+ */
+export async function fetchPendingRideRequest(): Promise<Ride | null> {
+  const { data, error } = await supabase
+    .from('rides')
+    .select(RIDE_COLUMNS)
+    .eq('status', 'requested')
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return (data as Ride | null) ?? null;
+}
+
+/**
  * Fills `otp_code` for the passenger viewer and blanks it for everyone else.
  * Runs in parallel with the rest of the view assembly.
  */

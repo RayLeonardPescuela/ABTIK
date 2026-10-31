@@ -1,25 +1,43 @@
-import React from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PhoneAuthForm } from '@/components/auth/PhoneAuthForm';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
+import { DEMO_ROLES, signInAsDemo, type DemoRole } from '@/lib/demoAuth';
 import { useAuth } from '@/providers/AuthProvider';
 import { colors } from '@/theme/colors';
 import type { UserRole } from '@/types/database';
 
 /**
- * Entry gate — phone OTP sign-in, then role-based routing.
- * `auth.uid()` is only valid once this screen has a real session, so every
- * downstream screen reads ids from the auth context instead of hardcoding them.
+ * Entry gate — phone OTP sign-in (or one-tap Demo Mode), then role-based
+ * routing. `auth.uid()` is only valid once this screen has a real session,
+ * so every downstream screen reads ids from the auth context instead of
+ * hardcoding them. Demo sign-in opens a real password session, so server-side
+ * auth behaves identically to the phone flow — no SMS anywhere.
  */
 export default function RoleGateScreen() {
   const { session, profile, loading, signOut, refreshProfile } = useAuth();
+  const [demoBusy, setDemoBusy] = useState<DemoRole | null>(null);
 
   const onContinue = () => {
     const role: UserRole = profile?.role ?? 'passenger';
     router.push(role === 'driver' ? '/(driver)/dashboard' : '/(passenger)/home');
+  };
+
+  const onDemoSignIn = async (role: DemoRole) => {
+    setDemoBusy(role);
+    try {
+      await signInAsDemo(role);
+    } catch (err) {
+      Alert.alert(
+        'Demo sign-in failed',
+        err instanceof Error ? err.message : 'Unknown error',
+      );
+    } finally {
+      setDemoBusy(null);
+    }
   };
 
   const onSignOut = async () => {
@@ -43,7 +61,26 @@ export default function RoleGateScreen() {
         {loading ? (
           <ActivityIndicator color={colors.accent} size="large" />
         ) : !session ? (
-          <PhoneAuthForm />
+          <>
+            <PhoneAuthForm />
+            <View style={styles.demoCard}>
+              <Text style={styles.demoDivider}>— or present with Demo Mode —</Text>
+              <Text style={styles.demoTitle}>One-tap role switch, no SMS</Text>
+              <Text style={styles.demoHint}>
+                Signs into seeded demo accounts with a real Supabase session,
+                so auth.uid() and every RLS rule behave exactly like
+                production. Use Sign out to switch roles.
+              </Text>
+              {DEMO_ROLES.map((role) => (
+                <PrimaryButton
+                  key={role}
+                  label={`Enter as ${role === 'driver' ? 'Driver' : 'Passenger'}`}
+                  loading={demoBusy === role}
+                  onPress={() => void onDemoSignIn(role)}
+                />
+              ))}
+            </View>
+          </>
         ) : !profile ? (
           <View style={styles.sessionCard}>
             <Text style={styles.sessionTitle}>Profile not loaded yet</Text>
@@ -133,5 +170,33 @@ const styles = StyleSheet.create({
     color: colors.textDim,
     fontSize: 13,
     lineHeight: 18,
+  },
+  demoCard: {
+    gap: 10,
+    backgroundColor: colors.bgPanel,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    borderRadius: 18,
+    padding: 16,
+  },
+  demoDivider: {
+    color: colors.accent,
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  demoTitle: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  demoHint: {
+    color: colors.textMuted,
+    fontSize: 12,
+    lineHeight: 17,
+    textAlign: 'center',
   },
 });
