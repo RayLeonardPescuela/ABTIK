@@ -61,22 +61,22 @@ BEGIN
 
   -- A1. seed identities; the handle_new_user trigger creates the profiles
   BEGIN
-    INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
+    INSERT INTO auth.users (instance_id, id, aud, role, email, phone, encrypted_password,
                             email_confirmed_at, created_at, updated_at,
                             raw_app_meta_data, raw_user_meta_data)
     VALUES
       ('00000000-0000-0000-0000-000000000000', c_passenger, 'authenticated', 'authenticated',
-       'abtik.test.passenger@example.com', crypt('abtik-test-pw', gen_salt('bf')),
+       'abtik.test.passenger@example.com', '+639170000001', crypt('abtik-test-pw', gen_salt('bf')),
        now(), now(), now(),
        '{"provider":"phone","providers":["phone"]}'::jsonb,
        jsonb_build_object('role','passenger','full_name','ABTIK Test Passenger','phone_number','+639170000001')),
       ('00000000-0000-0000-0000-000000000000', c_driver, 'authenticated', 'authenticated',
-       'abtik.test.driver@example.com', crypt('abtik-test-pw', gen_salt('bf')),
+       'abtik.test.driver@example.com', '+639170000002', crypt('abtik-test-pw', gen_salt('bf')),
        now(), now(), now(),
        '{"provider":"phone","providers":["phone"]}'::jsonb,
        jsonb_build_object('role','driver','full_name','ABTIK Test Driver','phone_number','+639170000002')),
       ('00000000-0000-0000-0000-000000000000', c_guardian, 'authenticated', 'authenticated',
-       'abtik.test.guardian@example.com', crypt('abtik-test-pw', gen_salt('bf')),
+       'abtik.test.guardian@example.com', '+639170000003', crypt('abtik-test-pw', gen_salt('bf')),
        now(), now(), now(),
        '{"provider":"phone","providers":["phone"]}'::jsonb,
        jsonb_build_object('role','passenger','full_name','ABTIK Test Guardian','phone_number','+639170000003'))
@@ -87,6 +87,12 @@ BEGIN
 
   IF (SELECT count(*) FROM public.profiles WHERE id IN (c_passenger, c_driver, c_guardian)) <> 3 THEN
     RAISE EXCEPTION 'FAIL (setup): auth.users rows did not produce profile rows (handle_new_user trigger missing?)';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.profiles
+     WHERE id IN (c_passenger, c_driver, c_guardian) AND phone_number IS NULL
+  ) THEN
+    RAISE EXCEPTION 'FAIL (setup): a profile has no phone_number (handle_new_user must copy auth.users.phone)';
   END IF;
 
   -- vetted, online driver parked on the campus pickup point + guardian links

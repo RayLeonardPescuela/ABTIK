@@ -92,6 +92,10 @@ CREATE OR REPLACE FUNCTION public.generate_otp()
 RETURNS TEXT
 LANGUAGE sql
 VOLATILE
+-- pgcrypto ships in the "extensions" schema on Supabase images while callers
+-- (create_ride/accept_ride) run with search_path = public — pin both so
+-- gen_random_bytes() resolves regardless of where the extension lives.
+SET search_path = public, extensions
 AS $$
   SELECT LPAD(
     (
@@ -536,27 +540,46 @@ DROP POLICY IF EXISTS "rides_insert_passenger" ON public.rides;
 -- -----------------------------------------------------------------------------
 -- SECTION 11 — RLS: guardians only see telemetry while a trip is live
 --   (participants keep full replay for their own trips.)
+--
+--   The rules live in a SECURITY DEFINER helper because the policy has to join
+--   rides + safety_circles + profiles: evaluated under the caller's own RLS,
+--   a guardian cannot SELECT a ride they do not participate in, which silently
+--   denied the guardian branch. The helper reads those tables as its owner —
+--   the same pattern as the peer helpers in SECTION 12.
 -- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.is_active_ride_observer(p_ride_id UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.rides r
+    WHERE r.id = p_ride_id
+      AND (r.passenger_id = auth.uid() OR r.driver_id = auth.uid())
+  )
+  OR EXISTS (
+    SELECT 1
+    FROM public.rides r
+    JOIN public.safety_circles sc ON sc.passenger_id = r.passenger_id
+    JOIN public.profiles g ON g.phone_number = sc.guardian_phone
+    WHERE r.id = p_ride_id
+      AND g.id = auth.uid()
+      AND sc.auto_notify = TRUE
+      AND r.status IN ('accepted', 'arrived', 'in_progress')
+  );
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.is_active_ride_observer(UUID) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.is_active_ride_observer(UUID) TO authenticated;
+
 DROP POLICY IF EXISTS "trip_logs_select_circle" ON public.trip_location_logs;
 CREATE POLICY "trip_logs_select_circle"
   ON public.trip_location_logs FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.rides r
-      WHERE r.id = trip_location_logs.ride_id
-        AND (r.passenger_id = auth.uid() OR r.driver_id = auth.uid())
-    )
-    OR EXISTS (
-      SELECT 1
-      FROM public.rides r
-      JOIN public.safety_circles sc ON sc.passenger_id = r.passenger_id
-      JOIN public.profiles g ON g.phone_number = sc.guardian_phone
-      WHERE r.id = trip_location_logs.ride_id
-        AND g.id = auth.uid()
-        AND sc.auto_notify = TRUE
-        AND r.status IN ('accepted', 'arrived', 'in_progress')
-    )
-  );
+  TO authenticated
+  USING (public.is_active_ride_observer(trip_location_logs.ride_id));
 
 -- -----------------------------------------------------------------------------
 -- SECTION 12 — Cross-table policy helpers (RLS anti-recursion)

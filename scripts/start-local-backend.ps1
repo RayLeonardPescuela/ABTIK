@@ -43,12 +43,24 @@ if ($LASTEXITCODE -ne 0) {
 # --- 2. start the local Supabase stack ---------------------------------------
 Write-Host '[2/4] Starting Supabase stack (first run downloads images)...'
 supabase start
+if ($LASTEXITCODE -ne 0) { throw 'supabase start failed - see output above.' }
 
 # --- 3. apply migrations onto a fresh database --------------------------------
 Write-Host '[3/4] Applying migrations to a fresh local database...'
 supabase db reset
+if ($LASTEXITCODE -ne 0) { throw 'Migration failed - see output above.' }
 
 # --- 4. run the verification suite --------------------------------------------
-Write-Host '[4/4] Running the verification suite (expect PASS ... ALL CHECKS PASSED):'
-Write-Host ''
+Write-Host '[4/4] Running the verification suite (green = no FAIL lines)...'
 supabase db query --local --file supabase\tests\verify_ride_flow.sql
+if ($LASTEXITCODE -ne 0) {
+  Write-Host ''
+  throw 'Verification suite FAILED - see the FAIL ... message above.'
+}
+
+Write-Host ''
+supabase db query --local "SELECT 'ALL CHECKS PASSED' AS verification"
+Write-Host ''
+Write-Host 'Local backend is ready:'
+Write-Host '  API     http://127.0.0.1:54321   (use this + the anon key in .env)'
+Write-Host '  Studio  http://127.0.0.1:54323   (browse tables, run SQL)'
