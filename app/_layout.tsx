@@ -23,6 +23,7 @@ export default function RootLayout() {
           }}
         >
           <Stack.Screen name="index" options={{ title: 'ABTIK' }} />
+          <Stack.Screen name="role-select" options={{ title: 'Select Role' }} />
           <Stack.Screen name="(passenger)" options={{ headerShown: false }} />
           <Stack.Screen name="(driver)" options={{ headerShown: false }} />
         </Stack>

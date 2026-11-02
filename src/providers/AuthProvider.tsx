@@ -1,8 +1,8 @@
 /**
  * ABTIK authentication context.
  *
- * Wraps Supabase Auth (phone OTP) and exposes the signed-in user together
- * with their `profiles` row. Every screen that talks to the database must
+ * Wraps Supabase Auth (demo-mode password sessions) and exposes the
+ * signed-in user together with their `profiles` row. Every screen that talks to the database must
  * read ids from here — `auth.uid()` on the server only resolves correctly
  * when the request carries a real session.
  */
@@ -18,7 +18,7 @@ import React, {
 import type { Session } from '@supabase/supabase-js';
 
 import { supabase } from '@/lib/supabaseClient';
-import type { Profile, UserRole } from '@/types/database';
+import type { Profile } from '@/types/database';
 
 /** How long to wait for the `handle_new_user` trigger before retrying. */
 const PROFILE_RETRY_DELAY_MS = 600;
@@ -32,10 +32,6 @@ interface AuthContextValue {
   profile: Profile | null;
   /** True while the session or profile is still being resolved. */
   loading: boolean;
-  /** Sends an SMS code. `role` is stored as metadata on first sign-up. */
-  signInWithPhone: (phone: string, role: UserRole) => Promise<void>;
-  /** Verifies the SMS code and opens the session. */
-  verifyOtp: (phone: string, token: string) => Promise<void>;
   /** Signs out and clears the local profile. */
   signOut: () => Promise<void>;
   /** Re-reads the profile row (e.g. after onboarding). */
@@ -134,22 +130,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [userId]);
 
-  const signInWithPhone = useCallback(async (phone: string, role: UserRole) => {
-    const { error } = await supabase.auth.signInWithOtp({
-      phone,
-      options: {
-        // Consumed by the handle_new_user trigger on first verification.
-        data: { role },
-      },
-    });
-    if (error) throw error;
-  }, []);
-
-  const verifyOtp = useCallback(async (phone: string, token: string) => {
-    const { error } = await supabase.auth.verifyOtp({ phone, token, type: 'sms' });
-    if (error) throw error;
-  }, []);
-
   const signOut = useCallback(async () => {
     setProfile(null);
     setProfileLoadedFor(null);
@@ -174,8 +154,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       userId,
       profile,
       loading: sessionLoading || (userId !== null && profileLoading),
-      signInWithPhone,
-      verifyOtp,
       signOut,
       refreshProfile,
     }),
@@ -185,8 +163,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       profile,
       sessionLoading,
       profileLoading,
-      signInWithPhone,
-      verifyOtp,
       signOut,
       refreshProfile,
     ],

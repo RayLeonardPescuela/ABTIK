@@ -10,7 +10,7 @@ const TONE_STYLES: Record<BadgeTone, { bg: string; fg: string }> = {
   accent: { bg: colors.accentSoft, fg: colors.accent },
   danger: { bg: colors.dangerSoft, fg: colors.danger },
   muted: { bg: colors.bgElevated, fg: colors.textMuted },
-  info: { bg: 'rgba(77, 163, 255, 0.16)', fg: colors.info },
+  info: { bg: 'rgba(96, 165, 250, 0.16)', fg: colors.info },
 };
 
 interface BadgeProps {

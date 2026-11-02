@@ -93,23 +93,23 @@ const styles = StyleSheet.create({
 
 /** Night-oriented Google Maps style — keeps interior roads readable */
 const DARK_MAP_STYLE = [
-  { elementType: 'geometry', stylers: [{ color: '#0B1220' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#9AA8C0' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#0B1220' }] },
+  { elementType: 'geometry', stylers: [{ color: colors.bg }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: colors.textMuted }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: colors.bg }] },
   {
     featureType: 'road',
     elementType: 'geometry',
-    stylers: [{ color: '#1C2740' }],
+    stylers: [{ color: colors.mapRoad }],
   },
   {
     featureType: 'road',
     elementType: 'geometry.stroke',
-    stylers: [{ color: '#243049' }],
+    stylers: [{ color: colors.border }],
   },
   {
     featureType: 'water',
     elementType: 'geometry',
-    stylers: [{ color: '#071018' }],
+    stylers: [{ color: '#071024' }],
   },
   {
     featureType: 'poi',

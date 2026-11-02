@@ -17,6 +17,7 @@ import * as Location from 'expo-location';
 
 import { beginTripStream, endTripStream } from '@/lib/activeTripStream';
 import { ABTIK_DRIVER_BACKGROUND_LOCATION } from '@/tasks/driverLocationTask';
+import { colors } from '@/theme/colors';
 
 /** Configuration knobs for the background stream. */
 export interface UseBackgroundLocationOptions {
@@ -128,7 +129,7 @@ export function useBackgroundLocation(
             notificationTitle: 'ABTIK Trip Active',
             notificationBody:
               'Live location is sharing with the passenger Safety Circle.',
-            notificationColor: '#F5A524',
+            notificationColor: colors.accent,
           },
         });
       } catch (err) {
