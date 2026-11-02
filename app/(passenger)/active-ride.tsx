@@ -38,6 +38,13 @@ const STATUS_LABEL: Record<RideStatus, string> = {
   cancelled: 'Cancelled',
 };
 
+/** Local-credential trust badges shown once a driver is matched. */
+const LOCAL_CREDENTIALS = [
+  'Verified Local Resident',
+  'Vetted Habal-Habal Driver',
+  'Sudlunon Navigation Expert',
+] as const;
+
 /**
  * FLOW A.3 — Passenger Active Ride Screen
  * Map + OTP + Safety Circle live status + SOS.
@@ -201,6 +208,13 @@ export default function PassengerActiveRideScreen() {
               ★ {Number(driver.rating).toFixed(1)}
               {driver.vetted_status ? ' · Vetted' : ''}
             </Text>
+            <View style={styles.trustRow}>
+              {LOCAL_CREDENTIALS.map((label) => (
+                <View key={label} style={styles.trustBadge}>
+                  <Text style={styles.trustBadgeText}>✓ {label}</Text>
+                </View>
+              ))}
+            </View>
           </View>
         ) : (
           <Text style={styles.waiting}>Matching a vetted motorcycle driver…</Text>
@@ -285,6 +299,25 @@ const styles = StyleSheet.create({
   driverMeta: {
     color: colors.textMuted,
     fontSize: 13,
+  },
+  trustRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 6,
+  },
+  trustBadge: {
+    backgroundColor: colors.successSoft,
+    borderWidth: 1,
+    borderColor: colors.successBorder,
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  trustBadgeText: {
+    color: colors.success,
+    fontSize: 11,
+    fontWeight: '700',
   },
   waiting: {
     color: colors.textMuted,

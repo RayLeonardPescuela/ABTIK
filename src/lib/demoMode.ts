@@ -88,6 +88,13 @@ export const DEMO_DRIVER_POSITION: LatLng = {
   longitude: 123.885,
 };
 
+/** Unclaimed verified drivers circling campus — the nearby-radar flavor. */
+export const DEMO_NEARBY_DRIVERS: LatLng[] = [
+  { latitude: 10.3149, longitude: 123.8843 },
+  { latitude: 10.3168, longitude: 123.8866 },
+  { latitude: 10.3151, longitude: 123.8876 },
+];
+
 /** Trip code both sides read in demo mode (no server-side rotation needed). */
 const DEMO_OTP = '4821';
 
