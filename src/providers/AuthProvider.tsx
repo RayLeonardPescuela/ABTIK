@@ -1,10 +1,14 @@
 /**
  * ABTIK authentication context.
  *
- * Wraps Supabase Auth (demo-mode password sessions) and exposes the
- * signed-in user together with their `profiles` row. Every screen that talks to the database must
- * read ids from here — `auth.uid()` on the server only resolves correctly
- * when the request carries a real session.
+ * Wraps Supabase Auth (demo-mode sessions) and exposes the signed-in user
+ * together with their `profiles` row. Every screen reads ids from here —
+ * `auth.uid()` on the server only resolves when the request carries a real
+ * session.
+ *
+ * Presentation demo mode (`isDemo`) bypasses all of that: `enterDemoMode()`
+ * hands out an in-memory demo profile + id so guards pass instantly with
+ * zero network, while the Supabase paths stay intact for real sessions.
  */
 
 import React, {
@@ -17,6 +21,7 @@ import React, {
 } from 'react';
 import type { Session } from '@supabase/supabase-js';
 
+import { DEMO_DRIVER_PROFILE, DEMO_PASSENGER, type DemoRole } from '@/lib/demoMode';
 import { supabase } from '@/lib/supabaseClient';
 import type { Profile } from '@/types/database';
 
@@ -32,6 +37,10 @@ interface AuthContextValue {
   profile: Profile | null;
   /** True while the session or profile is still being resolved. */
   loading: boolean;
+  /** True when screens should read the in-memory demo fixtures (no backend). */
+  isDemo: boolean;
+  /** Enters instant demo mode for a role — no network, no auth, no dialogs. */
+  enterDemoMode: (role: DemoRole) => void;
   /** Signs out and clears the local profile. */
   signOut: () => Promise<void>;
   /** Re-reads the profile row (e.g. after onboarding). */
@@ -50,8 +59,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    */
   const [profileLoadedFor, setProfileLoadedFor] = useState<string | null>(null);
 
-  const userId = session?.user.id ?? null;
+  /** Active demo persona (null = real session flow). */
+  const [demoRole, setDemoRole] = useState<DemoRole | null>(null);
+  const isDemo = demoRole !== null;
+  const demoProfile =
+    demoRole === 'passenger'
+      ? DEMO_PASSENGER
+      : demoRole === 'driver'
+        ? DEMO_DRIVER_PROFILE
+        : null;
+
+  const userId = (isDemo ? demoProfile?.id : null) ?? session?.user.id ?? null;
   const profileLoading = userId !== null && profileLoadedFor !== userId;
+  /** Demo persona wins over any restored real session. */
+  const effectiveProfile = isDemo ? demoProfile : profile;
 
   // Track the session (initial load + refreshes + sign in/out).
   useEffect(() => {
@@ -92,7 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // the first `await` runs in a microtask, so no setState happens in the
   // effect body itself.
   useEffect(() => {
-    if (!userId) return;
+    if (isDemo || !userId) return;
 
     let cancelled = false;
 
@@ -128,9 +149,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [userId]);
+  }, [userId, isDemo]);
+
+  const enterDemoMode = useCallback((role: DemoRole) => {
+    setDemoRole(role);
+  }, []);
 
   const signOut = useCallback(async () => {
+    setDemoRole(null);
     setProfile(null);
     setProfileLoadedFor(null);
     const { error } = await supabase.auth.signOut();
@@ -138,7 +164,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const refreshProfile = useCallback(async () => {
-    if (!userId) return;
+    if (isDemo || !userId) return;
     const { data } = await supabase
       .from('profiles')
       .select('*')
@@ -146,23 +172,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .maybeSingle();
     setProfile((data as Profile | null) ?? null);
     setProfileLoadedFor(userId);
-  }, [userId]);
+  }, [userId, isDemo]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
       session,
       userId,
-      profile,
-      loading: sessionLoading || (userId !== null && profileLoading),
+      profile: effectiveProfile,
+      loading: isDemo
+        ? false
+        : sessionLoading || (userId !== null && profileLoading),
+      isDemo,
+      enterDemoMode,
       signOut,
       refreshProfile,
     }),
     [
       session,
       userId,
-      profile,
+      effectiveProfile,
+      isDemo,
       sessionLoading,
       profileLoading,
+      enterDemoMode,
       signOut,
       refreshProfile,
     ],

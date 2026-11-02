@@ -1,10 +1,11 @@
 -- =============================================================================
 -- ABTIK — demo accounts for presentation mode (no SMS anywhere)
 -- =============================================================================
--- Creates two email/password accounts the app can enter with one tap
--- (src/lib/demoAuth.ts). They receive REAL Supabase sessions, so auth.uid(),
--- RLS and every SECURITY DEFINER RPC behave exactly like production — only
--- the credential entry point differs.
+-- Creates two email/password accounts for backend verification with real
+-- Supabase sessions, so auth.uid(), RLS and every SECURITY DEFINER RPC behave
+-- exactly like production. (The UI's presentation mode no longer signs in at
+-- all — it uses the in-memory fixtures in src/lib/demoMode.ts — so these
+-- accounts are for the local test rig / smoke tests only.)
 --
 --   demo.passenger@abtik.local  (+639171111111)  "Ana (Demo)"      passenger
 --   demo.driver@abtik.local     (+639172222222)  "Kuya Ben (Demo)" vetted driver

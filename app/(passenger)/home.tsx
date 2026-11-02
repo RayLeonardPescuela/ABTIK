@@ -14,7 +14,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { CampusMap } from '@/components/maps/CampusMap';
 import { FareEstimateCard } from '@/components/ride/FareEstimateCard';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
+import { SwitchRoleButton } from '@/components/ui/SwitchRoleButton';
 import { estimateFare } from '@/constants/fare';
+import { createDemoRide } from '@/lib/demoMode';
 import { useAuth } from '@/providers/AuthProvider';
 import { createRideRequest } from '@/services/rides';
 import { colors } from '@/theme/colors';
@@ -46,7 +48,7 @@ const DEFAULT_PICKUP: LatLng = { latitude: 10.3157, longitude: 123.8854 };
  * The displayed fare is an estimate; `create_ride` computes the real amount.
  */
 export default function PassengerHomeScreen() {
-  const { userId } = useAuth();
+  const { userId, isDemo } = useAuth();
   const [pickup] = useState<LatLng>(DEFAULT_PICKUP);
   const [dropoff, setDropoff] = useState<LatLng | null>(null);
   const [landmarkNotes, setLandmarkNotes] = useState('');
@@ -84,6 +86,22 @@ export default function PassengerHomeScreen() {
     try {
       setSubmitting(true);
       setError(null);
+
+      // Demo mode: build the ride in the shared store — zero network — and
+      // jump straight to the live screen.
+      if (isDemo) {
+        const ride = createDemoRide({
+          pickup,
+          dropoff,
+          dropoffAddress: landmarkNotes || 'Pinned interior drop-off',
+          landmarkNotes,
+        });
+        router.push({
+          pathname: '/(passenger)/active-ride',
+          params: { rideId: ride.id },
+        });
+        return;
+      }
 
       const ride = await createRideRequest({
         passengerId: userId, // must equal auth.uid() server-side
@@ -128,6 +146,7 @@ export default function PassengerHomeScreen() {
               Tap map to pin sudlunon drop-off
             </Text>
           </View>
+          <SwitchRoleButton style={styles.switchRole} />
         </View>
 
         <ScrollView
@@ -157,6 +176,11 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   flex: { flex: 1 },
   mapPane: { flex: 1.15, position: 'relative' },
+  switchRole: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+  },
   mapHint: {
     position: 'absolute',
     top: 16,

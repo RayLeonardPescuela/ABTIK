@@ -14,6 +14,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { IncomingRideModal } from '@/components/ride/IncomingRideModal';
 import { Badge } from '@/components/ui/Badge';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
+import { SwitchRoleButton } from '@/components/ui/SwitchRoleButton';
+import {
+  DEMO_DRIVER_ROW,
+  acceptDemoRide,
+  declineDemoRide,
+  getFirstRequestedDemoRide,
+  subscribeDemoRides,
+} from '@/lib/demoMode';
 import { subscribeToIncomingRides } from '@/lib/supabaseClient';
 import { useAuth } from '@/providers/AuthProvider';
 import {
@@ -38,7 +46,7 @@ const EMPTY_SETUP: DriverSetupInput = {
  * set `vetted_status` before the feed (and accept_ride) will hand over trips.
  */
 export default function DriverDashboardScreen() {
-  const { userId, profile, loading: authLoading } = useAuth();
+  const { userId, profile, loading: authLoading, isDemo } = useAuth();
 
   const [driverRow, setDriverRow] = useState<Driver | null>(null);
   /** Whose profile was last loaded — derives the loading flag without setState in effects. */
@@ -56,6 +64,15 @@ export default function DriverDashboardScreen() {
   const loadDriverRow = useCallback((): Promise<void> => {
     if (!userId) return Promise.resolve();
 
+    if (isDemo) {
+      // Vetted demo driver — skips onboarding straight to availability.
+      return Promise.resolve().then(() => {
+        setDriverRow(DEMO_DRIVER_ROW);
+        setError(null);
+        setDriverLoadedFor(userId);
+      });
+    }
+
     return fetchMyDriverRow()
       .then((row) => {
         setDriverRow(row);
@@ -67,7 +84,7 @@ export default function DriverDashboardScreen() {
       .then(() => {
         setDriverLoadedFor(userId);
       });
-  }, [userId]);
+  }, [userId, isDemo]);
 
   useEffect(() => {
     void loadDriverRow();
@@ -79,6 +96,19 @@ export default function DriverDashboardScreen() {
   // Nearby request feed: RLS only delivers to online, vetted drivers anyway.
   useEffect(() => {
     if (!isOnline || !readyForTrips) return;
+
+    if (isDemo) {
+      // Shared store: the passenger's booking pops the modal live, and the
+      // catch-up read surfaces the request pending since app start.
+      const sync = () => {
+        const ride = getFirstRequestedDemoRide();
+        setIncoming(
+          (current) => current ?? (ride ? { ...ride, otp_code: '' } : null),
+        );
+      };
+      sync();
+      return subscribeDemoRides(sync);
+    }
 
     // Catch up on requests that were already pending when the driver came
     // online (app restart, relogin, single-device demo) — the realtime
@@ -94,12 +124,20 @@ export default function DriverDashboardScreen() {
     return subscribeToIncomingRides((ride) => {
       setIncoming((current) => current ?? ride);
     });
-  }, [isOnline, readyForTrips]);
+  }, [isOnline, readyForTrips, isDemo]);
 
   const onToggleOnline = useCallback(
     async (next: boolean) => {
       if (next && !readyForTrips) {
         setError('Vetting required before you can go online.');
+        return;
+      }
+
+      if (isDemo) {
+        // Instant: no GPS permission prompt, no RPC — the feed reads the
+        // shared store directly.
+        setIsOnline(next);
+        if (!next) setIncoming(null);
         return;
       }
 
@@ -137,23 +175,34 @@ export default function DriverDashboardScreen() {
         setToggling(false);
       }
     },
-    [readyForTrips],
+    [readyForTrips, isDemo],
   );
 
-  const onAccept = useCallback(async (rideId: string) => {
-    try {
-      await acceptRide(rideId);
-      setIncoming(null);
-      router.push({ pathname: '/(driver)/trip', params: { rideId } });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Accept failed');
-      setIncoming(null);
-    }
-  }, []);
+  const onAccept = useCallback(
+    async (rideId: string) => {
+      try {
+        if (isDemo) {
+          acceptDemoRide(rideId);
+        } else {
+          await acceptRide(rideId);
+        }
+        setIncoming(null);
+        router.push({ pathname: '/(driver)/trip', params: { rideId } });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Accept failed');
+        setIncoming(null);
+      }
+    },
+    [isDemo],
+  );
 
-  const onDecline = useCallback((rideId: string) => {
-    setIncoming((current) => (current?.id === rideId ? null : current));
-  }, []);
+  const onDecline = useCallback(
+    (rideId: string) => {
+      if (isDemo) declineDemoRide(rideId);
+      setIncoming((current) => (current?.id === rideId ? null : current));
+    },
+    [isDemo],
+  );
 
   const onCreateDriverRow = async () => {
     try {
@@ -236,6 +285,11 @@ export default function DriverDashboardScreen() {
   // ---- Step 2: availability ------------------------------------------------
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <View style={styles.topBar}>
+        <Text style={styles.topBarTitle}>ABTIK · Driver</Text>
+        <SwitchRoleButton />
+      </View>
+
       <View style={styles.card}>
         <View style={styles.row}>
           <View>
@@ -297,6 +351,18 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg,
     padding: 16,
     gap: 16,
+  },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  topBarTitle: {
+    color: colors.textMuted,
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
   centered: {
     flex: 1,

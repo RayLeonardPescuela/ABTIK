@@ -1,16 +1,10 @@
-import React, { useCallback, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import React from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { DEMO_ROLES, signInAsDemo, type DemoRole } from '@/lib/demoAuth';
+import { DEMO_ROLES, type DemoRole } from '@/lib/demoMode';
+import { useAuth } from '@/providers/AuthProvider';
 import { colors } from '@/theme/colors';
 
 const ROLE_CARDS: Record<
@@ -19,7 +13,7 @@ const ROLE_CARDS: Record<
 > = {
   passenger: {
     icon: '🙋',
-    title: 'I need a ride',
+    title: 'I Need a Ride',
     blurb: 'Book campus & provincial trips',
     points: [
       'Live driver tracking',
@@ -29,7 +23,7 @@ const ROLE_CARDS: Record<
   },
   driver: {
     icon: '🛵',
-    title: 'I drive',
+    title: 'I Want to Drive',
     blurb: 'Accept trips and earn',
     points: [
       'Incoming ride radar',
@@ -40,54 +34,42 @@ const ROLE_CARDS: Record<
 };
 
 /**
- * Role Selection — the post-"Get Started" screen. Each card signs into a
- * seeded demo account (real Supabase session, so `auth.uid()` and RLS work)
- * and lands straight on the matching dashboard. No SMS/OTP anywhere.
+ * Role Selection — the instant demo entry after "Get Started".
+ *
+ * Tapping a card enters in-memory demo mode and navigates straight to that
+ * role's dashboard: no login screens, SMS codes, email forms, ID checks or
+ * verification dialogs anywhere in the flow. Fixtures (map, rides, Safety
+ * Circle) are already in memory, so the dashboard renders interactive on
+ * the very next frame.
  */
 export default function RoleSelectScreen() {
-  const [busy, setBusy] = useState<DemoRole | null>(null);
+  const { enterDemoMode } = useAuth();
 
-  const onPick = useCallback(async (role: DemoRole) => {
-    setBusy(role);
-    try {
-      await signInAsDemo(role);
-      router.replace(
-        role === 'driver' ? '/(driver)/dashboard' : '/(passenger)/home',
-      );
-    } catch (err) {
-      setBusy(null);
-      Alert.alert(
-        'Could not enter demo',
-        err instanceof Error ? err.message : 'Unknown error',
-      );
-    }
-  }, []);
+  const onPick = (role: DemoRole) => {
+    enterDemoMode(role);
+    router.replace(
+      role === 'driver' ? '/(driver)/dashboard' : '/(passenger)/home',
+    );
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
         <Text style={styles.title}>Choose your role</Text>
         <Text style={styles.subtitle}>
-          One tap into the full ABTIK experience — real sessions, zero SMS
-          codes. Switch roles anytime from the landing screen.
+          One tap into the full ABTIK experience — no login, no SMS, no
+          verification. Swap roles anytime with the ⇄ Switch Role button.
         </Text>
       </View>
 
       <View style={styles.cards}>
         {DEMO_ROLES.map((role) => {
           const card = ROLE_CARDS[role];
-          const isLoading = busy === role;
-          const isDisabled = busy !== null;
           return (
             <Pressable
               key={role}
-              disabled={isDisabled}
-              onPress={() => void onPick(role)}
-              style={({ pressed }) => [
-                styles.card,
-                pressed && !isDisabled && styles.cardPressed,
-                isDisabled && !isLoading && styles.cardDim,
-              ]}
+              onPress={() => onPick(role)}
+              style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
             >
               <Text style={styles.cardIcon}>{card.icon}</Text>
               <View style={styles.cardBody}>
@@ -101,11 +83,7 @@ export default function RoleSelectScreen() {
                   ))}
                 </View>
               </View>
-              {isLoading ? (
-                <ActivityIndicator color={colors.accent} />
-              ) : (
-                <Text style={styles.chevron}>→</Text>
-              )}
+              <Text style={styles.chevron}>→</Text>
             </Pressable>
           );
         })}
@@ -160,9 +138,6 @@ const styles = StyleSheet.create({
   cardPressed: {
     borderColor: colors.accent,
     transform: [{ scale: 0.99 }],
-  },
-  cardDim: {
-    opacity: 0.5,
   },
   cardIcon: {
     fontSize: 34,

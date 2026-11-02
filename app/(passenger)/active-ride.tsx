@@ -14,7 +14,14 @@ import { OtpDisplay } from '@/components/ride/OtpDisplay';
 import { SafetyCircleBanner } from '@/components/ride/SafetyCircleBanner';
 import { SosButton } from '@/components/ride/SosButton';
 import { Badge } from '@/components/ui/Badge';
+import { SwitchRoleButton } from '@/components/ui/SwitchRoleButton';
 import { useRideLocation } from '@/hooks/useRideLocation';
+import {
+  DEMO_DRIVER_POSITION,
+  getDemoRideView,
+  subscribeDemoRides,
+  triggerDemoSos,
+} from '@/lib/demoMode';
 import { useAuth } from '@/providers/AuthProvider';
 import { subscribeToRideStatus } from '@/lib/supabaseClient';
 import { fetchActiveRideView, triggerSos } from '@/services/rides';
@@ -36,16 +43,19 @@ const STATUS_LABEL: Record<RideStatus, string> = {
  * Map + OTP + Safety Circle live status + SOS.
  */
 export default function PassengerActiveRideScreen() {
-  const { userId } = useAuth();
+  const { userId, isDemo } = useAuth();
   const { rideId } = useLocalSearchParams<{ rideId: string }>();
   const [view, setView] = useState<ActiveRideView | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const { location: driverLiveLocation, isLive, isFresh } = useRideLocation(
+  const watchRideId =
     view?.ride.status === 'in_progress' || view?.ride.status === 'accepted'
       ? rideId
-      : null,
+      : null;
+  const { location: driverLiveLocation, isLive, isFresh } = useRideLocation(
+    // Demo mode has no GPS stream — the map shows the static driver marker.
+    isDemo ? null : watchRideId,
   );
 
   // `loading` starts true; state only changes inside promise handlers (never
@@ -54,6 +64,24 @@ export default function PassengerActiveRideScreen() {
     (options?: { silent?: boolean }): Promise<void> => {
       if (!rideId) return Promise.resolve();
       const silent = options?.silent ?? false;
+
+      if (isDemo) {
+        // Shared store read — completes on a microtask so `loading` still
+        // flips inside a promise handler (never in the mount effect body).
+        return Promise.resolve().then(() => {
+          try {
+            setView(getDemoRideView(rideId));
+            setError(null);
+          } catch (err) {
+            if (silent) {
+              console.warn('[ABTIK] background ride refresh failed', err);
+            } else {
+              setError(err instanceof Error ? err.message : 'Failed to load ride');
+            }
+          }
+          if (!silent) setLoading(false);
+        });
+      }
 
       return fetchActiveRideView(rideId)
         .then((data) => {
@@ -71,7 +99,7 @@ export default function PassengerActiveRideScreen() {
           if (!silent) setLoading(false);
         });
     },
-    [rideId],
+    [rideId, isDemo],
   );
 
   useEffect(() => {
@@ -82,6 +110,12 @@ export default function PassengerActiveRideScreen() {
   // below delivers the (rotated) post-acceptance code.
   useEffect(() => {
     if (!rideId) return;
+    if (isDemo) {
+      // Shared store: the driver's accept/start/complete lands here live.
+      return subscribeDemoRides(() => {
+        void load({ silent: true });
+      });
+    }
     return subscribeToRideStatus(rideId, (next) => {
       setView((prev) =>
         prev
@@ -89,7 +123,7 @@ export default function PassengerActiveRideScreen() {
           : prev,
       );
     });
-  }, [rideId]);
+  }, [rideId, isDemo, load]);
 
   // Re-fetch joins (driver, vehicle, profile, rotated OTP) as soon as a driver
   // is assigned or arrives — the realtime payload only carries the ride row.
@@ -139,9 +173,10 @@ export default function PassengerActiveRideScreen() {
           hubs={[]}
           pickup={pickup}
           dropoff={dropoff}
-          driverLocation={driverLiveLocation}
+          driverLocation={isDemo ? DEMO_DRIVER_POSITION : driverLiveLocation}
           showsUserLocation
         />
+        <SwitchRoleButton style={styles.switchRole} />
       </View>
 
       <ScrollView
@@ -186,7 +221,7 @@ export default function PassengerActiveRideScreen() {
         ) : null}
 
         <View style={styles.sosRow}>
-          <SosButton rideId={ride.id} onTrigger={triggerSos} />
+          <SosButton rideId={ride.id} onTrigger={isDemo ? triggerDemoSos : triggerSos} />
           <Text style={styles.sosHint}>
             SOS alerts guardians & campus security for this trip.
           </Text>
@@ -207,6 +242,11 @@ const styles = StyleSheet.create({
   },
   error: { color: colors.danger, textAlign: 'center' },
   mapPane: { flex: 1 },
+  switchRole: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+  },
   sheet: {
     maxHeight: '52%',
     backgroundColor: colors.bg,

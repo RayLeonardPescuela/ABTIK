@@ -14,7 +14,14 @@ import { CampusMap } from '@/components/maps/CampusMap';
 import { OtpKeypad } from '@/components/ride/OtpKeypad';
 import { Badge } from '@/components/ui/Badge';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
+import { SwitchRoleButton } from '@/components/ui/SwitchRoleButton';
 import { useBackgroundLocation } from '@/hooks/useBackgroundLocation';
+import {
+  getDemoRideView,
+  startDemoRideWithOtp,
+  subscribeDemoRides,
+  updateDemoRideStatus,
+} from '@/lib/demoMode';
 import { useAuth } from '@/providers/AuthProvider';
 import { subscribeToRideStatus, updateRideStatus } from '@/lib/supabaseClient';
 import { fetchActiveRideView, startRideWithOtp } from '@/services/rides';
@@ -26,7 +33,7 @@ import type { ActiveRideView } from '@/types/database';
  * FLOW B.3 — Trip execution: OTP start, nav overlay, background GPS stream.
  */
 export default function DriverTripScreen() {
-  const { userId } = useAuth();
+  const { userId, isDemo } = useAuth();
   const { rideId } = useLocalSearchParams<{ rideId: string }>();
   const [view, setView] = useState<ActiveRideView | null>(null);
   const [loading, setLoading] = useState(true);
@@ -43,6 +50,20 @@ export default function DriverTripScreen() {
   const load = useCallback((): Promise<void> => {
     if (!rideId) return Promise.resolve();
 
+    if (isDemo) {
+      // Shared store read — completes on a microtask so `loading` still
+      // flips inside a promise handler (never in the mount effect body).
+      return Promise.resolve().then(() => {
+        try {
+          setView(getDemoRideView(rideId));
+          setError(null);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Failed to load trip');
+        }
+        setLoading(false);
+      });
+    }
+
     return fetchActiveRideView(rideId)
       .then((data) => {
         setView(data);
@@ -54,7 +75,7 @@ export default function DriverTripScreen() {
       .then(() => {
         setLoading(false);
       });
-  }, [rideId]);
+  }, [rideId, isDemo]);
 
   useEffect(() => {
     void load();
@@ -62,6 +83,12 @@ export default function DriverTripScreen() {
 
   useEffect(() => {
     if (!rideId) return;
+    if (isDemo) {
+      // Shared store: passenger booking / status changes land here live.
+      return subscribeDemoRides(() => {
+        void load();
+      });
+    }
     return subscribeToRideStatus(rideId, (ride) => {
       // Never let a realtime payload introduce an OTP into driver state.
       setView((prev) =>
@@ -70,7 +97,7 @@ export default function DriverTripScreen() {
           : prev,
       );
     });
-  }, [rideId]);
+  }, [rideId, isDemo, load]);
 
   /**
    * Opens turn-by-turn navigation, trying platform-native schemes first and
@@ -112,19 +139,28 @@ export default function DriverTripScreen() {
       setOtpError(null);
       setActionError(null);
 
-      // Server compares the OTP (attempt-limited); returns the refreshed row.
-      const ride = await startRideWithOtp(rideId, code);
-      setView((prev) => (prev ? { ...prev, ride } : prev));
+      if (isDemo) {
+        // Same attempt/lockout semantics as `start_ride`, against the store.
+        const ride = startDemoRideWithOtp(rideId, code);
+        setView((prev) => (prev ? { ...prev, ride } : prev));
+      } else {
+        // Server compares the OTP (attempt-limited); returns the refreshed row.
+        const ride = await startRideWithOtp(rideId, code);
+        setView((prev) => (prev ? { ...prev, ride } : prev));
 
-      const tracking = await startTracking(rideId);
-      if (!tracking) {
-        setActionError(
-          'Trip started, but background GPS did not start — check location permissions so Safety Circle can follow.',
-        );
+        const tracking = await startTracking(rideId);
+        if (!tracking) {
+          setActionError(
+            'Trip started, but background GPS did not start — check location permissions so Safety Circle can follow.',
+          );
+        }
       }
 
-      // Navigation is best-effort; failures surface as navError, not OTP errors.
-      void openTurnByTurn();
+      // Navigation is best-effort; failures surface as navError, not OTP
+      // errors. Skipped in demo mode so the stage never leaves the app.
+      if (!isDemo) {
+        void openTurnByTurn();
+      }
     } catch (err) {
       setOtpError(err instanceof Error ? err.message : 'OTP verification failed');
     } finally {
@@ -136,7 +172,9 @@ export default function DriverTripScreen() {
     if (!rideId) return;
     try {
       setActionError(null);
-      const ride = await updateRideStatus(rideId, 'arrived');
+      const ride = isDemo
+        ? updateDemoRideStatus(rideId, 'arrived')
+        : await updateRideStatus(rideId, 'arrived');
       setView((prev) => (prev ? { ...prev, ride } : prev));
     } catch (err) {
       setActionError(
@@ -149,9 +187,15 @@ export default function DriverTripScreen() {
     if (!rideId) return;
     try {
       setActionError(null);
-      await updateRideStatus(rideId, 'completed', {
-        completed_at: new Date().toISOString(),
-      });
+      if (isDemo) {
+        updateDemoRideStatus(rideId, 'completed', {
+          completed_at: new Date().toISOString(),
+        });
+      } else {
+        await updateRideStatus(rideId, 'completed', {
+          completed_at: new Date().toISOString(),
+        });
+      }
     } catch (err) {
       setActionError(
         err instanceof Error ? err.message : 'Could not complete the trip',
@@ -159,10 +203,12 @@ export default function DriverTripScreen() {
       return; // keep streaming — the trip is not finished server-side
     }
 
-    try {
-      await stopTracking();
-    } catch (err) {
-      console.warn('[ABTIK] stopTracking after completion failed', err);
+    if (!isDemo) {
+      try {
+        await stopTracking();
+      } catch (err) {
+        console.warn('[ABTIK] stopTracking after completion failed', err);
+      }
     }
     router.replace('/(driver)/dashboard');
   };
@@ -191,20 +237,26 @@ export default function DriverTripScreen() {
   const pickup = geoJsonToLatLng(ride.pickup_location);
   const dropoff = geoJsonToLatLng(ride.dropoff_location);
   const needsOtp = ride.status === 'accepted' || ride.status === 'arrived';
+  // Demo mode shows the streaming indicator as live — Expo Go cannot
+  // background-stream GPS, and no permission prompts should fire on stage.
+  const streaming = isDemo || isTracking;
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <View style={styles.mapPane}>
         <CampusMap hubs={[]} pickup={pickup} dropoff={dropoff} />
         <View style={styles.navOverlay}>
-          <Badge
-            tone={isTracking ? 'live' : 'muted'}
-            label={
-              isTracking
-                ? 'GPS streaming to Safety Circle'
-                : 'GPS idle — start trip to stream'
-            }
-          />
+          <View style={styles.navRow}>
+            <Badge
+              tone={streaming ? 'live' : 'muted'}
+              label={
+                streaming
+                  ? 'GPS streaming to Safety Circle'
+                  : 'GPS idle — start trip to stream'
+              }
+            />
+            <SwitchRoleButton />
+          </View>
           {ride.status === 'in_progress' ? (
             <PrimaryButton
               label="Open Navigation"
@@ -267,6 +319,12 @@ const styles = StyleSheet.create({
     left: 16,
     right: 16,
     gap: 10,
+  },
+  navRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
   },
   navBtn: {
     backgroundColor: colors.overlay,
