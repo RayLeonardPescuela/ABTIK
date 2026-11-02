@@ -38,12 +38,8 @@ const STATUS_LABEL: Record<RideStatus, string> = {
   cancelled: 'Cancelled',
 };
 
-/** Local-credential trust badges shown once a driver is matched. */
-const LOCAL_CREDENTIALS = [
-  'Verified Local Resident',
-  'Vetted Habal-Habal Driver',
-  'Sudlunon Navigation Expert',
-] as const;
+/** Trust badges shown on the matched-driver identification card. */
+const DRIVER_TRUST_BADGES = ['Vetted Rider', 'Barangay Cleared'] as const;
 
 /**
  * FLOW A.3 — Passenger Active Ride Screen
@@ -200,16 +196,17 @@ export default function PassengerActiveRideScreen() {
 
         {driver && driverProfile ? (
           <View style={styles.driverCard}>
-            <Text style={styles.driverName}>{driverProfile.full_name}</Text>
-            <Text style={styles.driverMeta}>
-              {driver.vehicle_model} · {driver.vehicle_plate}
+            <Text style={styles.driverName}>
+              {driverProfile.full_name}
+              {driver.vetted_status ? ' (Verified Local Driver)' : ''}
             </Text>
+            <Text style={styles.driverVehicle}>{driver.vehicle_model}</Text>
             <Text style={styles.driverMeta}>
-              ★ {Number(driver.rating).toFixed(1)}
-              {driver.vetted_status ? ' · Vetted' : ''}
+              Plate: {driver.vehicle_plate} · ★{' '}
+              {Number(driver.rating).toFixed(1)}
             </Text>
             <View style={styles.trustRow}>
-              {LOCAL_CREDENTIALS.map((label) => (
+              {DRIVER_TRUST_BADGES.map((label) => (
                 <View key={label} style={styles.trustBadge}>
                   <Text style={styles.trustBadgeText}>✓ {label}</Text>
                 </View>
@@ -295,6 +292,11 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 17,
     fontWeight: '700',
+  },
+  driverVehicle: {
+    color: colors.textMuted,
+    fontSize: 14,
+    fontWeight: '600',
   },
   driverMeta: {
     color: colors.textMuted,

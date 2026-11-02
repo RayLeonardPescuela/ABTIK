@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Linking,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -12,11 +13,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CampusMap } from '@/components/maps/CampusMap';
 import { OtpKeypad } from '@/components/ride/OtpKeypad';
+import {
+  PassengerIdCard,
+  type PassengerIdentity,
+} from '@/components/ride/PassengerIdCard';
 import { Badge } from '@/components/ui/Badge';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { SwitchRoleButton } from '@/components/ui/SwitchRoleButton';
 import { useBackgroundLocation } from '@/hooks/useBackgroundLocation';
 import {
+  DEMO_COMMUTER_TYPE,
+  DEMO_PASSENGER,
   getDemoRideView,
   startDemoRideWithOtp,
   subscribeDemoRides,
@@ -240,6 +247,9 @@ export default function DriverTripScreen() {
   // Demo mode shows the streaming indicator as live — Expo Go cannot
   // background-stream GPS, and no permission prompts should fire on stage.
   const streaming = isDemo || isTracking;
+  const passengerIdentity: PassengerIdentity | null = isDemo
+    ? { name: DEMO_PASSENGER.full_name, commuterType: DEMO_COMMUTER_TYPE }
+    : null;
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
@@ -269,36 +279,47 @@ export default function DriverTripScreen() {
       </View>
 
       <View style={styles.panel}>
-        <Text style={styles.address}>{ride.dropoff_address}</Text>
-        {ride.landmark_notes ? (
-          <Text style={styles.notes}>{ride.landmark_notes}</Text>
-        ) : null}
-
-        {actionError ? <Text style={styles.error}>{actionError}</Text> : null}
-        {navError ? <Text style={styles.error}>{navError}</Text> : null}
-        {lastError ? <Text style={styles.error}>{lastError}</Text> : null}
-
-        {ride.status === 'accepted' ? (
-          <PrimaryButton
-            label="I've Arrived at Pickup"
-            onPress={() => void onMarkArrived()}
+        <ScrollView
+          style={styles.panelScroll}
+          contentContainerStyle={styles.panelContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          <PassengerIdCard
+            identity={passengerIdentity}
+            pickupAddress={ride.pickup_address}
+            dropoffAddress={ride.dropoff_address}
           />
-        ) : null}
 
-        {needsOtp ? (
-          <OtpKeypad
-            onSubmit={(code) => void onSubmitOtp(code)}
-            loading={otpLoading}
-            error={otpError}
-          />
-        ) : null}
+          {ride.landmark_notes ? (
+            <Text style={styles.notes}>{ride.landmark_notes}</Text>
+          ) : null}
 
-        {ride.status === 'in_progress' ? (
-          <PrimaryButton
-            label="Complete Trip"
-            onPress={() => void onComplete()}
-          />
-        ) : null}
+          {actionError ? <Text style={styles.error}>{actionError}</Text> : null}
+          {navError ? <Text style={styles.error}>{navError}</Text> : null}
+          {lastError ? <Text style={styles.error}>{lastError}</Text> : null}
+
+          {ride.status === 'accepted' ? (
+            <PrimaryButton
+              label="I've Arrived at Pickup"
+              onPress={() => void onMarkArrived()}
+            />
+          ) : null}
+
+          {needsOtp ? (
+            <OtpKeypad
+              onSubmit={(code) => void onSubmitOtp(code)}
+              loading={otpLoading}
+              error={otpError}
+            />
+          ) : null}
+
+          {ride.status === 'in_progress' ? (
+            <PrimaryButton
+              label="Complete Trip"
+              onPress={() => void onComplete()}
+            />
+          ) : null}
+        </ScrollView>
       </View>
     </SafeAreaView>
   );
@@ -334,13 +355,14 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 16,
-    gap: 12,
     maxHeight: '55%',
   },
-  address: {
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: '700',
+  panelScroll: {
+    flexShrink: 1,
+  },
+  panelContent: {
+    gap: 12,
+    paddingBottom: 32,
   },
   notes: {
     color: colors.textMuted,

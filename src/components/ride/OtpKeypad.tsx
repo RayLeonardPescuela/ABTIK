@@ -82,6 +82,7 @@ export function OtpKeypad({
 const styles = StyleSheet.create({
   wrap: {
     gap: 16,
+    paddingBottom: 24,
   },
   title: {
     color: colors.text,
@@ -110,6 +111,7 @@ const styles = StyleSheet.create({
   digit: {
     color: colors.text,
     fontSize: 24,
+    lineHeight: 30,
     fontWeight: '700',
   },
   error: {

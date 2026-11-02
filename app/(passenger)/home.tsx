@@ -28,7 +28,7 @@ import type { CampusHub, LatLng } from '@/types/database';
 const DEMO_HUBS: CampusHub[] = [
   {
     id: 'hub-1',
-    name: 'Main Gate Hub',
+    name: 'Main Campus Gate',
     campus_code: 'CAMPUS-A',
     location: { type: 'Point', coordinates: [123.8854, 10.3157] },
     is_active: true,
@@ -178,7 +178,7 @@ export default function PassengerHomeScreen() {
       const ride = await createRideRequest({
         passengerId: userId, // must equal auth.uid() server-side
         pickup,
-        pickupAddress: 'Main Gate Hub',
+        pickupAddress: 'Main Campus Gate',
         dropoff,
         dropoffAddress: landmarkNotes || 'Pinned interior drop-off',
         landmarkNotes,

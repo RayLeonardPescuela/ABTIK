@@ -36,16 +36,19 @@ const NOW = new Date().toISOString();
 
 export const DEMO_PASSENGER: Profile = {
   id: 'demo-passenger-0001',
-  full_name: 'Ana (Demo)',
+  full_name: 'Clint Wilson (Student)',
   phone_number: '+639171111111',
   avatar_url: null,
   role: 'passenger',
   created_at: NOW,
 };
 
+/** Passenger's commuter profile — drives the driver-side identity badge. */
+export const DEMO_COMMUTER_TYPE = 'Night Student';
+
 export const DEMO_DRIVER_PROFILE: Profile = {
   id: 'demo-driver-0001',
-  full_name: 'Kuya Ben (Demo)',
+  full_name: 'Kuya Mario',
   phone_number: '+639172222222',
   avatar_url: null,
   role: 'driver',
@@ -55,8 +58,8 @@ export const DEMO_DRIVER_PROFILE: Profile = {
 /** Vetted, campus-parked driver row — skips onboarding straight to the dashboard. */
 export const DEMO_DRIVER_ROW: Driver = {
   id: DEMO_DRIVER_PROFILE.id,
-  vehicle_plate: 'ABTIK DEMO',
-  vehicle_model: 'Honda TMX 125',
+  vehicle_plate: '789-ABC',
+  vehicle_model: 'Black Honda Click 125i',
   license_number: 'DL-DEMO-0001',
   is_online: false,
   current_location: latLngToGeoJson({ latitude: 10.3157, longitude: 123.8854 }),
@@ -134,9 +137,9 @@ function makeDemoRide(): Ride {
     passenger_id: DEMO_PASSENGER.id,
     driver_id: null,
     pickup_location: latLngToGeoJson(PICKUP),
-    pickup_address: 'Main Gate Hub',
+    pickup_address: 'Main Campus Gate',
     dropoff_location: latLngToGeoJson(DROPOFF),
-    dropoff_address: 'Sudlunon Proper',
+    dropoff_address: 'Interior Sudlunon Gate (Purok 3)',
     landmark_notes: 'Blue gate near the waiting shed',
     landmark_image_url: null,
     landmark_audio_url: null,

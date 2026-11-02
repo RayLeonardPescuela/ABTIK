@@ -34,6 +34,7 @@ const styles = StyleSheet.create({
   wrap: {
     alignItems: 'center',
     gap: 12,
+    paddingBottom: 24,
   },
   title: {
     color: colors.textMuted,
@@ -59,6 +60,7 @@ const styles = StyleSheet.create({
   digit: {
     color: colors.accent,
     fontSize: 28,
+    lineHeight: 34,
     fontWeight: '800',
     fontVariant: ['tabular-nums'],
   },

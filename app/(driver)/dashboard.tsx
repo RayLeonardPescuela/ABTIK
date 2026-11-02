@@ -16,7 +16,9 @@ import { Badge } from '@/components/ui/Badge';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { SwitchRoleButton } from '@/components/ui/SwitchRoleButton';
 import {
+  DEMO_COMMUTER_TYPE,
   DEMO_DRIVER_ROW,
+  DEMO_PASSENGER,
   acceptDemoRide,
   declineDemoRide,
   getFirstRequestedDemoRide,
@@ -338,6 +340,14 @@ export default function DriverDashboardScreen() {
       <IncomingRideModal
         ride={incoming}
         visible={Boolean(incoming)}
+        passenger={
+          isDemo
+            ? {
+                name: DEMO_PASSENGER.full_name,
+                commuterType: DEMO_COMMUTER_TYPE,
+              }
+            : null
+        }
         onAccept={(rideId) => void onAccept(rideId)}
         onDecline={onDecline}
       />
