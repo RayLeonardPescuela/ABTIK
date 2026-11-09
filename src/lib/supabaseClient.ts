@@ -17,28 +17,44 @@ import {
 import { authStorage } from '@/lib/authStorage';
 import type { LocationPayload, Ride, RideStatus } from '@/types/database';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.warn(
-    '[ABTIK] Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY.',
+    '[ABTIK] Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY — running with demo placeholders (no backend).',
   );
 }
+
+/**
+ * Fallbacks for builds without a `.env` (EAS cloud builds never upload
+ * gitignored files, so the EXPO_PUBLIC_* vars are undefined there).
+ * supabase-js *throws at import time* on empty strings
+ * ("supabaseUrl is required"), which would crash every route before React
+ * mounts and white-screen the app. Demo mode never touches the network, so
+ * syntactically-valid placeholders are safe; real sessions simply fail
+ * soft when no backend is configured.
+ */
+const DEMO_SUPABASE_URL = 'https://abtik-demo.supabase.co';
+const DEMO_SUPABASE_ANON_KEY = 'abtik-demo-anon-key';
 
 /**
  * Singleton Supabase client.
  * Auth tokens are persisted in the device keystore so sessions survive app
  * restarts without living in plaintext storage.
  */
-export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    storage: authStorage,
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: false,
+export const supabase: SupabaseClient = createClient(
+  supabaseUrl || DEMO_SUPABASE_URL,
+  supabaseAnonKey || DEMO_SUPABASE_ANON_KEY,
+  {
+    auth: {
+      storage: authStorage,
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: false,
+    },
   },
-});
+);
 
 /**
  * Builds the canonical Realtime channel name for a ride's GPS stream.

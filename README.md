@@ -215,6 +215,11 @@ Google Maps key falls back to the built-in dark vector map, so **no Maps key
 is required** for a demo build. Use the `production` profile for a Play Store
 AAB.
 
+> **Note:** EAS builds do not upload `.env` (it is gitignored), so
+> `EXPO_PUBLIC_*` vars are undefined in cloud builds — the Supabase client
+> falls back to demo placeholders and the app runs fully offline in demo
+> mode. No backend is required for the presentation APK.
+
 ## License
 
 Private / proprietary — ABTIK campus mobility blueprint.
