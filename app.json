@@ -39,7 +39,12 @@
         "ACCESS_FINE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION",
         "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_LOCATION"
+        "FOREGROUND_SERVICE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION"
       ],
       "config": {
         "googleMaps": {
@@ -64,9 +69,13 @@
       "typedRoutes": true
     },
     "extra": {
+      "router": {
+        "origin": false
+      },
       "eas": {
-        "projectId": "replace-with-eas-project-id"
+        "projectId": "43ec9573-4719-4e71-ba95-0a3602ae50f7"
       }
-    }
+    },
+    "owner": "clintwilson123"
   }
 }
