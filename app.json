@@ -54,6 +54,7 @@
     },
     "plugins": [
       "expo-router",
+      "./plugins/withGradleDistribution.js",
       [
         "expo-splash-screen",
         {
