@@ -10,20 +10,21 @@ Production blueprint for a hybrid **Grab-style motorcycle ride-hail** + **Life36
 | Backend | Supabase (Auth, Postgres, Realtime, Edge Functions) |
 | Spatial | PostGIS `geography(POINT, 4326)` + GiST indexes |
 | Maps | `react-native-maps` + `expo-location` / TaskManager |
-| Auth | Supabase Auth (email + phone OTP) |
+| Auth | Supabase Auth (session restore; demo mode needs none) |
 
 ## Repository map
 
 ```
 app/
-  index.tsx                     # Auth gate: phone OTP + role-based routing
-  (passenger)/home.tsx          # Map + fare booking panel
-  (passenger)/active-ride.tsx   # OTP, Safety Circle, SOS, live map
-  (driver)/dashboard.tsx        # Driver setup, online toggle, incoming ride modal
-  (driver)/trip.tsx             # OTP keypad, nav, background GPS
+  index.tsx                     # Landing: Get Started → role select (demo-first)
+  role-select.tsx               # Passenger / Driver role cards → instant dashboards
+  (passenger)/home.tsx          # Map + fare booking panel (sudlunon presets)
+  (passenger)/active-ride.tsx   # OTP, driver ID card, Safety Circle, SOS, live map
+  (driver)/dashboard.tsx        # Online toggle, feed, incoming ride modal
+  (driver)/trip.tsx             # OTP keypad, passenger ID card, nav, background GPS
 src/
-  providers/AuthProvider.tsx    # Supabase Auth session + profile context
-  components/auth/PhoneAuthForm.tsx
+  providers/AuthProvider.tsx    # Supabase session + synthetic demo profile
+  lib/demoMode.ts               # In-memory demo fixtures + pub/sub store
   lib/supabaseClient.ts         # Client (secure session storage) + Realtime helpers
   lib/authStorage.ts            # Keychain/Keystore-backed session persistence
   lib/activeTripStream.ts       # Background GPS publisher state
@@ -40,9 +41,14 @@ supabase/migrations/            # PostGIS schema + RLS + RPCs
 
 ## Quick start
 
+> **Demo/presentation mode:** steps 1–6 are optional for a live demo —
+> `npm install && npx expo start` boots straight into instant demo mode
+> (role cards → dashboards, no backend) with a keyless dark map fallback.
+
 1. Create a Supabase project and enable **PostGIS**.
-2. Enable **Phone auth** (Dashboard → Authentication → Providers → Phone) — ABTIK
-   signs users in with SMS OTP. Add test numbers or a Twilio/EASMS provider.
+2. Optional — enable **Phone auth** (Dashboard → Authentication → Providers →
+   Phone) if you want real Supabase sessions; the shipped UI is demo-first
+   and never asks for an SMS code. Add test numbers or a Twilio/EASMS provider.
 3. Run migrations **in order** from `supabase/migrations/` (SQL editor or CLI):
    `20241027000000_init_abtik.sql` then `20261031000001_fix_ride_flow_rpcs_and_rls.sql`.
 4. In Dashboard → Database → Replication, confirm `rides`, `trip_location_logs`, and `drivers` are on Realtime.
@@ -78,9 +84,13 @@ before a store submission (same filenames, no config changes needed).
 
 ### Sign-in
 
-1. **Phone OTP** — passenger or driver role, verified by SMS (`app/index.tsx`).
-2. Role decides the landing screen; drivers additionally need a `drivers` row
-   (created in-app) and admin vetting before they can go online.
+1. **Instant demo mode** — Get Started → Passenger or Driver role card →
+   straight into that dashboard. No SMS/OTP/ID check; mock state lives in
+   `src/lib/demoMode.ts` so every feature works immediately. Both dashboards
+   offer **Switch Role** for seamless Passenger ⇄ Driver demos.
+2. **Real sessions** — when a Supabase session already exists, Get Started
+   skips role-select and lands on the matching dashboard. Drivers additionally
+   need a `drivers` row (created in-app) and admin vetting before going online.
 
 ### Passenger
 
@@ -143,7 +153,8 @@ Ride lifecycle still uses `postgres_changes` on `rides` for status (`requested` 
 
 ### Phase 1 — Auth & profiles
 
-- [x] Wire Supabase Auth (phone OTP primary for provincial users) — `AuthProvider` + `PhoneAuthForm`.
+- [x] Wire Supabase Auth (session persistence + profile context) — `AuthProvider`;
+  phone-OTP UI retired in favour of instant demo mode (role cards).
 - [x] Replace demo UUIDs with `auth.getUser()` (`useAuth().userId` everywhere).
 - [x] Driver onboarding: plate, motorcycle, license in-app → `vetted_status` admin gate.
 
@@ -190,6 +201,19 @@ Ride lifecycle still uses `postgres_changes` on `rides` for status (`requested` 
   clients is the guarded status state machine.
 - `otp_code` is stripped from every driver-facing read (row selects and
   realtime payloads) and is rotated on acceptance; only the passenger can read it.
+
+## Publishing (EAS Build)
+
+```bash
+npx eas-cli login                  # free account at expo.dev
+npx eas-cli build -p android --profile preview   # installable APK
+```
+
+The `preview` profile (see `eas.json`) produces an APK you can install on any
+Android phone — ideal for stage demos with no laptop tether. The placeholder
+Google Maps key falls back to the built-in dark vector map, so **no Maps key
+is required** for a demo build. Use the `production` profile for a Play Store
+AAB.
 
 ## License
 
